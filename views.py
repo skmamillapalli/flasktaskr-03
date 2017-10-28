@@ -2,11 +2,16 @@ from flask import Flask, request, session, url_for, redirect, render_template, f
 from functools import wraps
 import _config
 import sqlite3
-from forms import AddTaskForm
+from forms import AddTaskForm, RegisterForm, LoginForm
+from flask_sqlalchemy import SQLAlchemy
+import datetime
+
 
 app = Flask(__name__)
 app.config.from_object(_config)
+db = SQLAlchemy(app)
 
+from models import Task, User
 
 def login_required(func):
 	@wraps(func)
@@ -23,77 +28,96 @@ def login_required(func):
 def login():
 	status_code = 200
 	error = None
+	print(request.form)
+	form = LoginForm(request.form)
 	#print(type(request.form))
 	if request.method == 'POST':
-		if request.form['username'] == app.config['USERNAME'] and request.form['username'] == app.config['PASSWORD']:
-			session['logged_in'] = True
-			flash('Welcome')
-			return redirect(url_for('tasks'))
+		if form.validate_on_submit():
+			#print(form.user.data)
+			#print(form.password.data)
+			#print(dir(db.session.query(User).filter_by(name=form.user.data)))
+			#print(dir(User.query.filter_by(name=form.user.name)))
+			# Few diff between above two methods
+			c_user = User.query.filter_by(name=form.user.data).first()
+			print(c_user)
+			if c_user is not None and form.password.data == c_user.password:
+				session['logged_in'] = True
+				session['user_id'] = c_user.id
+				flash('Welcome, ' + form.user.data)
+				return redirect(url_for('tasks'))
+			else:
+				status_code = 401
+				error = 'Invalid credentials, please login again.'
+				return render_template('login.html', error=error, form=form)
 		else:
-			status_code = 401
-			error = 'Invalid credentials, please login again.'
-			return render_template('login.html', error=error)
-	return render_template('login.html')
+			error="All fields are required"
+	return render_template('login.html', error=error, form=form)
+
+@app.route('/register/', methods=['GET','POST'])
+def register():
+	error=None
+	form = RegisterForm(request.form)
+	if request.method == 'POST':
+		if form.validate_on_submit():
+			db.session.add(User(form.name.data,form.email.data,form.password.data))
+			db.session.commit()
+			flash('New user added successfully!! Please login to Continue.')
+			return redirect(url_for('login'))
+	return render_template('register.html', error=error, form=form)
 
 
 @app.route("/logout")
 @login_required
 def logout():
 	session.pop('logged_in', None)
+	session.pop('user_id', None)
 	flash('Logged out successfully.')
 	return redirect(url_for('login'))
 
 @app.route("/tasks")
 @login_required
 def tasks():
-	g.db = sqlite3.connect(app.config['DATABASE_PATH'])
-	cur = g.db.cursor()
-	cur.execute("SELECT name, due_date, priority, task_id from TASKS where status=1")
-	open_tasks = [dict(name=row[0], due_date=row[1], priority=row[2], task_id=row[3])  for row in cur.fetchall()]
-	cur.execute("SELECT name, due_date, priority, task_id from TASKS where status=0")
-	closed_tasks = [dict(name=row[0], due_date=row[1], priority=row[2], task_id=row[3])  for row in cur.fetchall()]
+	open_tasks = db.session.query(Task).filter_by(status='1').order_by(Task.due_date.asc())
+	closed_tasks = db.session.query(Task).filter_by(status='0').order_by(Task.due_date.asc())	
 	return render_template('tasks.html', form=AddTaskForm(request.form), closed_tasks=closed_tasks, open_tasks=open_tasks)
 
+
+####--------https://wtforms.readthedocs.io/en/latest/crash_course.html#rendering-fields--------####
 # Add new task
 @app.route('/add/', methods=['POST'])		
 @login_required
 def new_task():	
-	g.db = sqlite3.connect(app.config['DATABASE_PATH'])
-	name = request.form['name']
-	due_date = request.form['due_date']
-	priority = request.form['priority']
-	status = 1
-	if not name or not due_date or not priority:
-		flash('All fields are mandatory')
-		return redirect(url_for('tasks'))
-	g.db.execute("INSERT INTO TASKS(name, due_date, priority, status) VALUES(?,?,?,?)", [name, due_date, priority, 1])
-	g.db.commit()
-	g.db.close()
-	flash('New entry was posted successfully, Thanks!')
+	form = AddTaskForm(request.form)
+	if request.method == 'POST':
+		if form.validate_on_submit():
+			new_task = Task(form.name.data,
+							form.due_date.data,
+							form.priority.data,
+							'1',
+							datetime.datetime.utcnow(),							
+							session['user_id']
+							)
+			db.session.add(new_task)			
+			db.session.commit()
+			flash('New entry was posted successfully, Thanks!')
+		else:
+			flash("Please enter the data in correct format.")
 	return redirect(url_for('tasks'))	
 
 #Mark a task as complete
 @app.route('/complete/<int:task_id>/')
 @login_required
 def complete(task_id):
-	g.db=sqlite3.connect(app.config['DATABASE_PATH'])
-	g.db.execute('UPDATE tasks set status=0 where task_id='+str(task_id))
-	g.db.commit()
-	g.db.close()
+	db.session.query(Task).filter_by(task_id=task_id).update({"status":"0"})
+	db.session.commit()
 	flash('The task status was updated')
 	return redirect(url_for('tasks'))
 
+#Delete the record with the given id
 @app.route('/delete/<int:task_id>/')
 @login_required
 def delete_entry(task_id):
-	g.db = sqlite3.connect(app.config['DATABASE_PATH'])
-	g.db.execute('DELETE from tasks where task_id='+str(task_id))
-	g.db.commit()
-	g.db.close()
+	db.session.query(Task).filter_by(task_id=task_id).delete()
+	db.session.commit()	
 	flash('Record deleted successfully!')
 	return redirect(url_for('tasks'))
-
-
-
-
-

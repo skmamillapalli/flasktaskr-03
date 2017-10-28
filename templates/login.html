@@ -3,19 +3,21 @@
 <h1>Welcome to Flastaskr</h1>
 <h3> Please login to access your content</h3>
 <br>
-<div>
-	<form action="{{ url_for('login')}}" method="post">
-		<div class="input-group">
-			<label for="username">Username:</label>
-			<input type="text" name="username" id="username" value="{{ request.form.username }}">
+	<form action="{{ url_for('login') }}" method="post">
+		{{ form.csrf_token }}
+		<div>
+			{{ form.user.label }}
+			{{ form.user }}			
 		</div>
 		<div>
-			<label for="password">Password:</label>
-			<input type="password" name="password" id="password" value="{{ request.form.password }}">
+			{{ form.password.label }}
+			{{ form.password }}
 		</div>
 		<div>
 			<button type="submit"> Login:</button>
 		</div>		
 	</form>
-	<p><em>Use 'admin' and 'admin' for the username and password.</em></p>
+<div class="">
+	<p>Need an account.? <a href="{{ url_for('register') }}">Signup</a></p>
+</div>
 {% endblock %}

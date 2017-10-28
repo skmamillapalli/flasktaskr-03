@@ -104,6 +104,14 @@ label {
   border: none;
 }
 
+.inline-form  .input-group{
+display: inline-block;
+margin: 10px 5px;
+}
+.input-group input {
+width: 100%;
+}
+
 .datagrid table tbody td {
   color: #000000;
   border-left: 1px solid #E1EEF4;
