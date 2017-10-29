@@ -93,7 +93,11 @@ label {
 .datagrid table td, .datagrid table th {
   padding: 3px 10px;
 }
-
+.error {
+color: red;
+font-size: .8em;
+background-color: #E6E6FA;
+}
 .datagrid table thead th {
   background-color:#000000;
   color:#FFFFFF;
@@ -103,6 +107,10 @@ label {
 .datagrid table thead th:first-child {
   border: none;
 }
+
+.half-width .input-group{
+  width: 50%;
+  }
 
 .inline-form  .input-group{
 display: inline-block;

@@ -1,5 +1,4 @@
 from views import db
-
 class Task(db.Model):
 	__tablename__ = 'tasks'
 	task_id = db.Column(db.Integer, primary_key=True)
@@ -38,4 +37,3 @@ class User(db.Model):
 
 	def __repr__(self):
 		return '<User {}>'.format(self.name)
-

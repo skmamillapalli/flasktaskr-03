@@ -5,6 +5,7 @@ import sqlite3
 from forms import AddTaskForm, RegisterForm, LoginForm
 from flask_sqlalchemy import SQLAlchemy
 import datetime
+from sqlalchemy.exc import IntegrityError
 
 
 app = Flask(__name__)
@@ -59,10 +60,14 @@ def register():
 	form = RegisterForm(request.form)
 	if request.method == 'POST':
 		if form.validate_on_submit():
-			db.session.add(User(form.name.data,form.email.data,form.password.data))
-			db.session.commit()
-			flash('New user added successfully!! Please login to Continue.')
-			return redirect(url_for('login'))
+			try:
+				db.session.add(User(form.name.data,form.email.data,form.password.data))
+				db.session.commit()
+				flash('New user added successfully!! Please login to Continue.')
+				return redirect(url_for('login'))
+			except IntegrityError as e:
+				error = "The user name/email already exist"				
+				return render_template('register.html', error=error, form=form)
 	return render_template('register.html', error=error, form=form)
 
 
@@ -74,12 +79,21 @@ def logout():
 	flash('Logged out successfully.')
 	return redirect(url_for('login'))
 
+def open_tasks():
+	return db.session.query(Task).filter_by(status='1').order_by(Task.due_date.asc())
+
+def closed_tasks():
+	return db.session.query(Task).filter_by(status='0').order_by(Task.due_date.asc())
+
 @app.route("/tasks")
 @login_required
 def tasks():
-	open_tasks = db.session.query(Task).filter_by(status='1').order_by(Task.due_date.asc())
-	closed_tasks = db.session.query(Task).filter_by(status='0').order_by(Task.due_date.asc())	
-	return render_template('tasks.html', form=AddTaskForm(request.form), closed_tasks=closed_tasks, open_tasks=open_tasks)
+	return render_template('tasks.html', form=AddTaskForm(request.form), closed_tasks=closed_tasks(), open_tasks=open_tasks())
+
+def flash_errors(form):
+	for field, errors in form.errors.items():
+		for error in errors:
+			flash('Error in the {} field - {}'.format(getattr(form, field).label.text, error))
 
 
 ####--------https://wtforms.readthedocs.io/en/latest/crash_course.html#rendering-fields--------####
@@ -87,6 +101,7 @@ def tasks():
 @app.route('/add/', methods=['POST'])		
 @login_required
 def new_task():	
+	error = None
 	form = AddTaskForm(request.form)
 	if request.method == 'POST':
 		if form.validate_on_submit():
@@ -100,9 +115,12 @@ def new_task():
 			db.session.add(new_task)			
 			db.session.commit()
 			flash('New entry was posted successfully, Thanks!')
-		else:
-			flash("Please enter the data in correct format.")
-	return redirect(url_for('tasks'))	
+			return redirect(url_for('tasks'))
+													
+		#flash_errors(form)
+	# It doesn't work if we simply redirect in case of unsuccessful entries, we gotta display the errors
+	# Note that form object is reinitialized AddTaskForm(request.form) in views controller action function.
+	return render_template('tasks.html', error=error, form=form, open_tasks=open_tasks(), closed_tasks= closed_tasks())
 
 #Mark a task as complete
 @app.route('/complete/<int:task_id>/')

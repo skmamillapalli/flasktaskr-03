@@ -1,0 +1,23 @@
+{% extends "_base.html" %}
+{% block content %}
+<h1>Welcome to Flastaskr</h1>
+<h3> Please login to access your content</h3>
+<br>
+	<form action="{{ url_for('login') }}" method="post">
+		{{ form.csrf_token }}
+		<div>
+			{{ form.user.label }}
+			{{ form.user }}			
+		</div>
+		<div>
+			{{ form.password.label }}
+			{{ form.password }}
+		</div>
+		<div>
+			<button type="submit"> Login:</button>
+		</div>		
+	</form>
+<div class="">
+	<p>Need an account.? <a href="{{ url_for('register') }}">Signup</a></p>
+</div>
+{% endblock %}
